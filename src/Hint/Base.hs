@@ -1,3 +1,6 @@
+
+{-# LANGUAGE OverloadedStrings #-}
+
 module Hint.Base (
     MonadInterpreter(..), RunGhc,
 
@@ -21,6 +24,7 @@ module Hint.Base (
 
 import Control.Monad.IO.Class
 import Control.Monad.Catch as MC
+import Control.Monad
 
 import Data.IORef
 import Data.Dynamic
@@ -29,6 +33,9 @@ import qualified Data.List
 import qualified Hint.GHC as GHC
 
 import Hint.Extension
+
+import System.IO (hPutStrLn, stderr)
+import qualified Data.Text as T
 
 -- | Version of the underlying ghc api. Values are:
 --
@@ -168,7 +175,14 @@ mayFail action =
         case (maybe_res, null es) of
             (Nothing, True)  -> throwM $ UnknownError "Got no error message"
             (Nothing, False) -> throwM $ WontCompile (reverse es)
-            (Just a, _)      -> return a
+            (Just a, x)      -> liftIO $ do
+                                  hPutStrLn stderr "running interpret action"
+                                  unless x $ do
+                                    hPutStrLn stderr "got warnings:"
+                                    let messages = unlines $ Data.List.nub $ map errMsg es
+                                        messages' = T.unpack $ T.replace "error:\n" "warning:\n" $ T.pack messages
+                                    hPutStrLn stderr messages'
+                                  return a
 
 -- ================= Debugging stuff ===============
 
